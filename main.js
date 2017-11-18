@@ -43,6 +43,7 @@ let extract_page = async function (browser, url) {
         await parse_page(page2, school_sel),
         degree,
     ].join(",");
+    page2.close()
     return {user, user_line};
 };
 
@@ -78,6 +79,7 @@ async function run() {
             write_oneline(linkedin, user_line);
         } catch (err) {
             console.log(`${linkedin} fail`)
+            write_oneline(linkedin, 'fail');
         }
         // wire_to_file(linkedin, user);
     }
