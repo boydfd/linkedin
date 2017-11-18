@@ -75,7 +75,7 @@ async function run() {
     for( let linkedin of linkedins) {
         try {
             const {user, user_line} = await extract_page(browser, linkedin);
-            write_oneline(user_line);
+            write_oneline(linkedin, user_line);
         } catch (err) {
             console.log(`${linkedin} fail`)
         }
