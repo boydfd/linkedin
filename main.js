@@ -8,43 +8,69 @@ async function parse_page(page, selector) {
         let element = document.querySelector(sel);
         return element && element.innerHTML;
     }, selector);
-    return username && username.replace(/\n|\s/g, '');
+    return username && username.replace(/\n/g, '');
 }
 
-let extract_page = async function (browser, url) {
+async function get_industry(page) {
+    const experience_sel = '.pv-entity__summary-info';
+    const industry_sel = '.company-industries';
+    let industry;
+    const result = await page.evaluate((sel) => {
+        return document.querySelector(sel);
+    }, experience_sel);
+    if (result) {
+        await page.click(experience_sel);
+        await page.waitFor(2 * 1000);
+        await page.waitForSelector(industry_sel);
+        industry = await parse_page(page, industry_sel);
+    }
+    return industry;
+}
+
+let extract_page = async (browser, url) => {
     console.log('deal url: ' + url);
     const page2 = await browser.newPage();
-    const wait_times = Math.random() * (10 - 2) + 2;
+    const wait_times = Math.random() * (3 - 1) + 1;
     await page2.waitFor(wait_times * 1000);
     await page2.goto(url);
-    await page2.waitForNavigation();
+    await page2.waitForNavigation({
+        waitUtil: 'networkidle2',
+        timeout: 0,
+    });
     const name_selector = '.pv-top-card-section__name';
     const title_selector = '.pv-top-card-section__headline';
     const company_sel = '.pv-top-card-section__company';
     const school_sel = '.pv-top-card-section__school';
     const degree_sel = '.pv-entity__comma-item';
-    await page2.waitFor(2 * 1000);
     let degree;
-    let timeout = 5;
+    let timeout = 2;
     while ((degree = await parse_page(page2, degree_sel)) === null && timeout--) {
-        await page2.waitFor(2 * 1000)
+        await page2.waitFor(2 * 1000);
     }
+    let name = await parse_page(page2, name_selector);
+    let title = await parse_page(page2, title_selector);
+    let company = await parse_page(page2, company_sel);
+    let school = await parse_page(page2, school_sel);
+    const industry = await get_industry(page2)
     const user = {
-        name: await parse_page(page2, name_selector),
-        title: await parse_page(page2, title_selector),
-        company: await parse_page(page2, company_sel),
-        school: await parse_page(page2, school_sel),
+        name,
+        title,
+        company,
+        school,
         degree,
+        industry,
     };
     const user_line = [
-        await parse_page(page2, name_selector),
-        await parse_page(page2, title_selector),
-        await parse_page(page2, company_sel),
-        await parse_page(page2, school_sel),
+        name,
+        title,
+        company,
+        school,
         degree,
-    ].join(",");
-    page2.close()
-    return {user, user_line};
+        industry,
+    ].map(a => a && a.replace(/&amp;/g, '&'))
+        .map(a => a && ("'" + a + "'")).join(",");
+    page2.close();
+    return { user, user_line };
 };
 
 function wire_to_file(url, obj) {
@@ -73,12 +99,13 @@ async function run() {
     await page.screenshot({ path: 'screenshots/password.png' });
     await page.click(BUTTON_SELECTOR);
     await page.waitForNavigation({ 'timeout': 0 });
-    for( let linkedin of linkedins) {
+    for (let linkedin of linkedins) {
         try {
-            const {user, user_line} = await extract_page(browser, linkedin);
+            const { user, user_line } = await extract_page(browser, linkedin);
             write_oneline(linkedin, user_line);
         } catch (err) {
-            console.log(`${linkedin} fail`)
+            console.log(err);
+            console.log(`${linkedin} fail`);
             write_oneline(linkedin, 'fail');
         }
         // wire_to_file(linkedin, user);
